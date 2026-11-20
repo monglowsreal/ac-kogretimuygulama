@@ -17,6 +17,11 @@ import {
   FileCheck2,
   Trash2,
 } from "lucide-react";
+import {
+  CourseUnitDraft,
+  CourseUnitScopeFields,
+  createDefaultUnitDraft,
+} from "@/components/CourseUnitConfigModal";
 import { useCoach } from "@/context/CoachContext";
 import { EVREN_CHAT_MODELS } from "@/data/evren-models";
 import { classifyCourseCategory } from "@/lib/classifier";
@@ -71,6 +76,9 @@ export function Sidebar({
   const [manualCategory, setManualCategory] = useState<CourseCategory | "auto">(
     "auto"
   );
+  const [unitDraft, setUnitDraft] = useState<CourseUnitDraft>(() =>
+    createDefaultUnitDraft()
+  );
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const isAddFormVisible = showAddModal || (hydrated && state.courses.length === 0);
@@ -91,11 +99,13 @@ export function Sidebar({
       newCourseName,
       finalCategory,
       undefined,
-      newCourseCode
+      newCourseCode,
+      unitDraft
     );
     setNewCourseName("");
     setNewCourseCode("");
     setManualCategory("auto");
+    setUnitDraft(createDefaultUnitDraft());
     setShowAddModal(false);
     selectCourse(created.id, 1, "upload");
     onCloseMobile();
@@ -248,6 +258,11 @@ export function Sidebar({
                   <option value="teknik">Teknik / Kodlama</option>
                 </select>
               </div>
+              <CourseUnitScopeFields
+                value={unitDraft}
+                onChange={setUnitDraft}
+                compact
+              />
               <button
                 type="submit"
                 disabled={!newCourseName.trim()}
@@ -305,7 +320,9 @@ export function Sidebar({
                             : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
                         }`}
                       >
-                        {progress.vizeCompleted}/{progress.vizeTotal} V
+                        {progress.vizeTotal > 0
+                          ? `${progress.vizeCompleted}/${progress.vizeTotal} V`
+                          : `${progress.finalCompleted}/${progress.finalTotal} F`}
                       </span>
                     </button>
                     {isConfirming ? (
@@ -384,7 +401,9 @@ export function Sidebar({
                             : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
                         }`}
                       >
-                        {progress.vizeCompleted}/{progress.vizeTotal} V
+                        {progress.vizeTotal > 0
+                          ? `${progress.vizeCompleted}/${progress.vizeTotal} V`
+                          : `${progress.finalCompleted}/${progress.finalTotal} F`}
                       </span>
                     </button>
                     {isConfirming ? (

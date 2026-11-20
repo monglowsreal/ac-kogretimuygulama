@@ -15,14 +15,34 @@ import {
   XCircle,
 } from "lucide-react";
 import { AnswerKeySection } from "@/components/AnswerKeySection";
-import { TOTAL_UNITS, VIZE_UNIT_LIMIT } from "@/data/courses";
 import { useCoach } from "@/context/CoachContext";
 import { calculateAofNet } from "@/lib/classifier";
+import { getCourseUnitConfig } from "@/lib/course-units";
 import {
   AiGenerationMeta,
+  QuizAttempt,
   QuizOptionKey,
   QuizQuestion,
 } from "@/types/coach";
+
+function createExamAttemptRecord(
+  courseId: string,
+  unitNumber: number,
+  questions: QuizQuestion[],
+  answers: Record<string, QuizOptionKey | "BOS">,
+  stats: ReturnType<typeof calculateAofNet>
+): QuizAttempt {
+  const now = new Date();
+  return {
+    id: `exam-${now.getTime().toString(36)}`,
+    courseId,
+    unitNumber,
+    questions,
+    answers,
+    ...stats,
+    completedAt: now.toISOString(),
+  };
+}
 
 export function MockExamView() {
   const {
@@ -38,18 +58,22 @@ export function MockExamView() {
   const [courseId, setCourseId] = useState(state.courses[0]?.id ?? "");
   const selectedCourse =
     state.courses.find((c) => c.id === courseId) ?? state.courses[0];
+  const unitCfg = selectedCourse ? getCourseUnitConfig(selectedCourse) : null;
 
-  const availableUnits = selectedCourse
-    ? Array.from({ length: TOTAL_UNITS }, (_, i) => i + 1).filter(
-        (u) => getUnitRecord(selectedCourse.id, u).rawText.trim().length >= 50
-      )
-    : [];
+  const availableUnits =
+    selectedCourse && unitCfg
+      ? unitCfg.unitNumbers.filter(
+          (u) => getUnitRecord(selectedCourse.id, u).rawText.trim().length >= 50
+        )
+      : [];
 
   const [customUnitsByCourse, setCustomUnitsByCourse] = useState<
     Record<string, number[]>
   >({});
   const selectedUnits = selectedCourse
-    ? (customUnitsByCourse[selectedCourse.id] ?? availableUnits)
+    ? (customUnitsByCourse[selectedCourse.id]?.filter((u) =>
+        availableUnits.includes(u)
+      ) ?? availableUnits)
     : [];
   const [questionCount, setQuestionCount] = useState<10 | 15 | 20>(20);
   const [revealMode, setRevealMode] = useState<"immediate" | "end">(
@@ -92,11 +116,13 @@ export function MockExamView() {
     }));
   };
 
-  const applyPreset = (mode: "vize" | "final") => {
-    if (!selectedCourse) return;
-    const filtered = availableUnits.filter((u) =>
-      mode === "vize" ? u <= VIZE_UNIT_LIMIT : true
-    );
+  const applyPreset = (mode: "vize" | "final" | "all") => {
+    if (!selectedCourse || !unitCfg) return;
+    const filtered = availableUnits.filter((u) => {
+      if (mode === "vize") return unitCfg.vizeSet.has(u);
+      if (mode === "final") return unitCfg.finalSet.has(u);
+      return true;
+    });
     setCustomUnitsByCourse((prev) => ({
       ...prev,
       [selectedCourse.id]: filtered,
@@ -182,15 +208,15 @@ export function MockExamView() {
   const handleSubmitExam = () => {
     if (!examQuestions || !selectedCourse) return;
     const stats = calculateAofNet(examQuestions, answers);
-    recordQuizAttempt({
-      id: `exam-${Date.now().toString(36)}`,
-      courseId: selectedCourse.id,
-      unitNumber: selectedUnits[0] || 1,
-      questions: examQuestions,
-      answers,
-      ...stats,
-      completedAt: new Date().toISOString(),
-    });
+    recordQuizAttempt(
+      createExamAttemptRecord(
+        selectedCourse.id,
+        selectedUnits[0] || 1,
+        examQuestions,
+        answers,
+        stats
+      )
+    );
     setSubmittedStats(stats);
   };
 
@@ -624,22 +650,31 @@ export function MockExamView() {
             <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
               3. Sınava Dahil Üniteler (Yalnızca metin yüklenmiş üniteler seçilebilir)
             </label>
-            {availableUnits.length > 0 && (
-              <div className="flex gap-2">
+            {availableUnits.length > 0 && unitCfg && (
+              <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() => applyPreset("vize")}
                   className="rounded-lg bg-amber-500/10 px-2.5 py-1 text-[11px] font-semibold text-amber-700 hover:bg-amber-500/20 dark:text-amber-300"
                 >
-                  Vize (1–4)
+                  Vize ({unitCfg.vizeLabel})
                 </button>
                 <button
                   type="button"
                   onClick={() => applyPreset("final")}
                   className="rounded-lg bg-indigo-500/10 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-500/20 dark:text-indigo-300"
                 >
-                  Tümü (Final)
+                  Final ({unitCfg.finalLabel})
                 </button>
+                {unitCfg.finalUnits.length < unitCfg.totalUnits && (
+                  <button
+                    type="button"
+                    onClick={() => applyPreset("all")}
+                    className="rounded-lg bg-slate-500/10 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-500/20 dark:text-slate-300"
+                  >
+                    Tümü
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -650,8 +685,8 @@ export function MockExamView() {
               menüden derse girip en az 1 ünite içeriği ekleyin.
             </div>
           ) : (
-            <div className="grid grid-cols-4 gap-2 sm:grid-cols-8">
-              {Array.from({ length: TOTAL_UNITS }, (_, i) => i + 1).map((u) => {
+            <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8">
+              {(unitCfg?.unitNumbers ?? []).map((u) => {
                 const enabled = availableUnits.includes(u);
                 const checked = selectedUnits.includes(u);
                 return (

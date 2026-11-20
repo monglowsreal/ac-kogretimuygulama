@@ -10,10 +10,12 @@ import {
   FileText,
   HelpCircle,
   Printer,
+  SlidersHorizontal,
 } from "lucide-react";
 import { A4PrintModal } from "@/components/A4PrintModal";
-import { TOTAL_UNITS, VIZE_UNIT_LIMIT } from "@/data/courses";
+import { CourseUnitConfigModal } from "@/components/CourseUnitConfigModal";
 import { useCoach } from "@/context/CoachContext";
+import { getCourseUnitConfig, getUnitExamInfo } from "@/lib/course-units";
 import { QuizTab } from "@/components/QuizTab";
 import { StudyGuideTab } from "@/components/StudyGuideTab";
 import { UnitInputTab } from "@/components/UnitInputTab";
@@ -40,6 +42,7 @@ export function UnitWorkspace() {
   const [isGeneratingGuide, setIsGeneratingGuide] = useState(false);
   const [guideError, setGuideError] = useState<string | null>(null);
   const [printModalOpen, setPrintModalOpen] = useState(false);
+  const [unitConfigOpen, setUnitConfigOpen] = useState(false);
 
   if (!selectedCourse) {
     return (
@@ -49,7 +52,7 @@ export function UnitWorkspace() {
           Henüz Bir Ders Eklenmedi
         </h2>
         <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
-          Sol panelden ders adını yazıp ekledikten sonra 1–8. ünite içeriklerini
+          Sol panelden ders adını yazıp ekledikten sonra ünite içeriklerini
           yükleyebilir, A4 çıktı ve 5 şıklı quiz oluşturabilirsin.
         </p>
         <button
@@ -64,12 +67,18 @@ export function UnitWorkspace() {
   }
 
   const progress = getCourseProgress(selectedCourse.id);
+  const unitCfg = getCourseUnitConfig(selectedCourse);
+  const effectiveUnitNumber = Math.max(
+    1,
+    Math.min(selectedUnitNumber, unitCfg.totalUnits)
+  );
   const isTech = selectedCourse.category === "teknik";
-  const isVizeUnit = selectedUnitNumber <= VIZE_UNIT_LIMIT;
-  const hasAnyCourseContent = Array.from(
-    { length: TOTAL_UNITS },
-    (_, i) => i + 1
-  ).some((u) => {
+  const examInfo = getUnitExamInfo(
+    effectiveUnitNumber,
+    unitCfg.vizeSet,
+    unitCfg.finalSet
+  );
+  const hasAnyCourseContent = unitCfg.unitNumbers.some((u) => {
     const rec = getUnitRecord(selectedCourse.id, u);
     return Boolean(rec.guide || rec.rawText.trim().length >= 50);
   });
@@ -86,7 +95,8 @@ export function UnitWorkspace() {
         body: JSON.stringify({
           courseName: selectedCourse.name,
           category: selectedCourse.category,
-          unitNumber: selectedUnitNumber,
+          unitNumber: effectiveUnitNumber,
+          examScopeLabel: examInfo.badgeText,
           unitText: currentUnitRecord.rawText,
           contentMode: currentUnitRecord.contentMode ?? "auto",
           preferredProvider: aiPreference,
@@ -104,7 +114,7 @@ export function UnitWorkspace() {
         throw new Error(data.error || "Çalışma rehberi oluşturulamadı.");
       }
 
-      saveStudyGuide(selectedCourse.id, selectedUnitNumber, data.guide);
+      saveStudyGuide(selectedCourse.id, effectiveUnitNumber, data.guide);
       setActiveSubTab("guide");
     } catch (err) {
       setGuideError(
@@ -143,19 +153,19 @@ export function UnitWorkspace() {
               </span>
               <span
                 className={`rounded-lg px-2.5 py-1 text-xs font-semibold ${
-                  isVizeUnit
+                  examInfo.tone === "both" || examInfo.tone === "vize"
                     ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                    : "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
+                    : examInfo.tone === "final"
+                      ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
+                      : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
                 }`}
               >
-                {isVizeUnit
-                  ? "Vize + Final Kapsamında"
-                  : "Final Kapsamında (5–8)"}
+                {examInfo.badgeText}
               </span>
             </div>
 
             <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-              {selectedCourse.name} — Ünite {selectedUnitNumber}
+              {selectedCourse.name} — Ünite {effectiveUnitNumber}
             </h2>
             <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
               {selectedCourse.description}
@@ -193,7 +203,7 @@ export function UnitWorkspace() {
               <button
                 type="button"
                 onClick={() =>
-                  toggleUnitCompleted(selectedCourse.id, selectedUnitNumber)
+                  toggleUnitCompleted(selectedCourse.id, effectiveUnitNumber)
                 }
               className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition ${
                 currentUnitRecord.completed
@@ -217,51 +227,75 @@ export function UnitWorkspace() {
           </div>
         </div>
 
-        {/* 1-8 Ünite Seçim Şeridi */}
+        {/* Ünite Seçim Şeridi ve Kapsam Ayarı */}
         <div className="mt-5 border-t border-slate-200 pt-4 dark:border-slate-800">
-          <div className="grid grid-cols-4 gap-2 sm:grid-cols-8">
-            {Array.from({ length: TOTAL_UNITS }, (_, i) => i + 1).map(
-              (unitNum) => {
-                const rec = getUnitRecord(selectedCourse.id, unitNum);
-                const isSelected = selectedUnitNumber === unitNum;
-                const isVize = unitNum <= VIZE_UNIT_LIMIT;
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+              <span>
+                Toplam <strong className="text-slate-700 dark:text-slate-200">{unitCfg.totalUnits} ünite</strong>
+              </span>
+              <span>•</span>
+              <span className="text-amber-600 dark:text-amber-400 font-medium">
+                Vize: {unitCfg.vizeLabel}
+              </span>
+              <span>•</span>
+              <span className="text-indigo-600 dark:text-indigo-400 font-medium">
+                Final: {unitCfg.finalLabel}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setUnitConfigOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700 transition hover:border-indigo-400 hover:bg-indigo-500/10 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-indigo-300"
+            >
+              <SlidersHorizontal className="h-3.5 w-3.5" />
+              Ünite Sayısı & Vize/Final Ayarla
+            </button>
+          </div>
 
-                return (
-                  <button
-                    key={unitNum}
-                    type="button"
-                    onClick={() => {
-                      selectUnit(unitNum);
-                      setGuideError(null);
-                    }}
-                    className={`flex flex-col items-center rounded-xl border px-2 py-2 text-xs transition ${
+          <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8">
+            {unitCfg.unitNumbers.map((unitNum) => {
+              const rec = getUnitRecord(selectedCourse.id, unitNum);
+              const isSelected = effectiveUnitNumber === unitNum;
+              const uExam = getUnitExamInfo(
+                unitNum,
+                unitCfg.vizeSet,
+                unitCfg.finalSet
+              );
+
+              return (
+                <button
+                  key={unitNum}
+                  type="button"
+                  onClick={() => {
+                    selectUnit(unitNum);
+                    setGuideError(null);
+                  }}
+                  className={`flex flex-col items-center rounded-xl border px-2 py-2 text-xs transition ${
+                    isSelected
+                      ? "border-indigo-600 bg-indigo-600 text-white shadow-sm shadow-indigo-500/25"
+                      : rec.completed
+                        ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 dark:text-emerald-300"
+                        : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-300 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  <span className="font-bold">Ünite {unitNum}</span>
+                  <span
+                    className={`mt-0.5 text-[10px] ${
                       isSelected
-                        ? "border-indigo-600 bg-indigo-600 text-white shadow-sm shadow-indigo-500/25"
-                        : rec.completed
-                          ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 dark:text-emerald-300"
-                          : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-300 dark:hover:bg-slate-800"
+                        ? "text-indigo-100"
+                        : uExam.inVize
+                          ? "text-amber-600 dark:text-amber-400"
+                          : uExam.inFinal
+                            ? "text-indigo-600 dark:text-indigo-400"
+                            : "text-slate-400"
                     }`}
                   >
-                    <span className="font-bold">Ünite {unitNum}</span>
-                    <span
-                      className={`mt-0.5 text-[10px] ${
-                        isSelected
-                          ? "text-indigo-100"
-                          : isVize
-                            ? "text-amber-600 dark:text-amber-400"
-                            : "text-slate-400"
-                      }`}
-                    >
-                      {rec.guide
-                        ? "Rehber Hazır"
-                        : isVize
-                          ? "Vize"
-                          : "Final"}
-                    </span>
-                  </button>
-                );
-              }
-            )}
+                    {rec.guide ? "Rehber Hazır" : uExam.shortText}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -336,12 +370,19 @@ export function UnitWorkspace() {
       {activeSubTab === "quiz" && <QuizTab />}
 
       <A4PrintModal
-        key={`${selectedCourse.id}-${selectedUnitNumber}-${printModalOpen ? "open" : "closed"}`}
+        key={`${selectedCourse.id}-${effectiveUnitNumber}-${printModalOpen ? "open" : "closed"}`}
         open={printModalOpen}
         onClose={() => setPrintModalOpen(false)}
         course={selectedCourse}
-        initialUnitNumber={selectedUnitNumber}
+        initialUnitNumber={effectiveUnitNumber}
       />
+
+      {unitConfigOpen && (
+        <CourseUnitConfigModal
+          course={selectedCourse}
+          onClose={() => setUnitConfigOpen(false)}
+        />
+      )}
     </div>
   );
 }

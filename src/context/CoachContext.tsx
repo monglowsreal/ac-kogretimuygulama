@@ -9,8 +9,12 @@ import React, {
   useState,
   useSyncExternalStore,
 } from "react";
-import { DEFAULT_COURSES, TOTAL_UNITS, VIZE_UNIT_LIMIT } from "@/data/courses";
+import { DEFAULT_COURSES } from "@/data/courses";
 import { classifyCourseCategory, makeUnitKey } from "@/lib/classifier";
+import {
+  CourseUnitConfigInput,
+  getCourseUnitConfig,
+} from "@/lib/course-units";
 import {
   getInitialCoachState,
   isLocalLoopbackHost,
@@ -90,8 +94,13 @@ interface CoachContextValue {
     name: string,
     category?: CourseCategory,
     description?: string,
-    code?: string
+    code?: string,
+    unitConfig?: CourseUnitConfigInput
   ) => Course;
+  updateCourseUnitConfig: (
+    courseId: string,
+    config: CourseUnitConfigInput
+  ) => void;
   deleteCourse: (courseId: string) => void;
   loadSampleCurriculum: () => void;
   updateUnitText: (
@@ -344,23 +353,39 @@ export function CoachProvider({ children }: { children: React.ReactNode }) {
     clientAiOverrideStore.set(cfg ?? undefined);
   }, []);
 
+  const selectedCourse = useMemo(() => {
+    return (
+      state.courses.find((c) => c.id === selectedCourseId) ??
+      state.courses[0] ??
+      null
+    );
+  }, [state.courses, selectedCourseId]);
+
   const selectCourse = useCallback(
     (courseId: string, unitNumber?: number, subTab?: CourseSubTab) => {
+      const targetCourse = state.courses.find((c) => c.id === courseId);
+      const maxUnits = getCourseUnitConfig(targetCourse).totalUnits;
       setSelectedCourseId(courseId);
       if (unitNumber !== undefined) {
-        setSelectedUnitNumber(unitNumber);
+        setSelectedUnitNumber(Math.max(1, Math.min(unitNumber, maxUnits)));
+      } else {
+        setSelectedUnitNumber((prev) => Math.max(1, Math.min(prev, maxUnits)));
       }
       if (subTab !== undefined) {
         setActiveSubTab(subTab);
       }
       setActiveView("course");
     },
-    []
+    [state.courses]
   );
 
-  const selectUnit = useCallback((unitNumber: number) => {
-    setSelectedUnitNumber(unitNumber);
-  }, []);
+  const selectUnit = useCallback(
+    (unitNumber: number) => {
+      const maxUnits = getCourseUnitConfig(selectedCourse).totalUnits;
+      setSelectedUnitNumber(Math.max(1, Math.min(unitNumber, maxUnits)));
+    },
+    [selectedCourse]
+  );
 
   const getUnitRecord = useCallback(
     (courseId: string, unitNumber: number): UnitRecord => {
@@ -370,17 +395,11 @@ export function CoachProvider({ children }: { children: React.ReactNode }) {
     [state.units]
   );
 
-  const selectedCourse = useMemo(() => {
-    return (
-      state.courses.find((c) => c.id === selectedCourseId) ??
-      state.courses[0] ??
-      null
-    );
-  }, [state.courses, selectedCourseId]);
-
   const currentUnitRecord = useMemo(() => {
     if (!selectedCourse) return createEmptyUnit(selectedUnitNumber);
-    return getUnitRecord(selectedCourse.id, selectedUnitNumber);
+    const maxUnits = getCourseUnitConfig(selectedCourse).totalUnits;
+    const clamped = Math.max(1, Math.min(selectedUnitNumber, maxUnits));
+    return getUnitRecord(selectedCourse.id, clamped);
   }, [selectedCourse, selectedUnitNumber, getUnitRecord]);
 
   const addCourse = useCallback(
@@ -388,7 +407,8 @@ export function CoachProvider({ children }: { children: React.ReactNode }) {
       name: string,
       category?: CourseCategory,
       description?: string,
-      code?: string
+      code?: string,
+      unitConfig?: CourseUnitConfigInput
     ): Course => {
       const trimmed = name.trim();
       const detected = category ?? classifyCourseCategory(trimmed, description);
@@ -396,6 +416,7 @@ export function CoachProvider({ children }: { children: React.ReactNode }) {
       const cleanCode = code?.trim()
         ? code.trim().toLocaleUpperCase("tr-TR")
         : "DERS";
+      const normalizedUnits = getCourseUnitConfig(unitConfig);
       const newCourse: Course = {
         id,
         name: trimmed,
@@ -407,6 +428,9 @@ export function CoachProvider({ children }: { children: React.ReactNode }) {
             ? "Teknik / kodlama odaklı çalışma dersi."
             : "Sözel / kavramsal odaklı çalışma dersi."),
         isCustom: true,
+        totalUnits: normalizedUnits.totalUnits,
+        vizeUnits: normalizedUnits.vizeUnits,
+        finalUnits: normalizedUnits.finalUnits,
       };
       updateCoachState((prev) => ({
         ...prev,
@@ -415,6 +439,31 @@ export function CoachProvider({ children }: { children: React.ReactNode }) {
       return newCourse;
     },
     []
+  );
+
+  const updateCourseUnitConfig = useCallback(
+    (courseId: string, config: CourseUnitConfigInput) => {
+      const normalized = getCourseUnitConfig(config);
+      updateCoachState((prev) => ({
+        ...prev,
+        courses: prev.courses.map((course) =>
+          course.id === courseId
+            ? {
+                ...course,
+                totalUnits: normalized.totalUnits,
+                vizeUnits: normalized.vizeUnits,
+                finalUnits: normalized.finalUnits,
+              }
+            : course
+        ),
+      }));
+      if (selectedCourseId === courseId) {
+        setSelectedUnitNumber((prev) =>
+          Math.max(1, Math.min(prev, normalized.totalUnits))
+        );
+      }
+    },
+    [selectedCourseId]
   );
 
   const deleteCourse = useCallback(
@@ -682,29 +731,36 @@ export function CoachProvider({ children }: { children: React.ReactNode }) {
 
   const getCourseProgress = useCallback(
     (courseId: string): CourseProgress => {
-      let vizeCompleted = 0;
-      let finalCompleted = 0;
+      const course = state.courses.find((c) => c.id === courseId);
+      const unitCfg = getCourseUnitConfig(course);
 
-      for (let u = 1; u <= TOTAL_UNITS; u++) {
-        const rec = state.units[makeUnitKey(courseId, u)];
-        if (rec?.completed) {
-          finalCompleted += 1;
-          if (u <= VIZE_UNIT_LIMIT) {
-            vizeCompleted += 1;
-          }
+      let vizeCompleted = 0;
+      for (const u of unitCfg.vizeUnits) {
+        if (state.units[makeUnitKey(courseId, u)]?.completed) {
+          vizeCompleted += 1;
         }
       }
 
+      let finalCompleted = 0;
+      for (const u of unitCfg.finalUnits) {
+        if (state.units[makeUnitKey(courseId, u)]?.completed) {
+          finalCompleted += 1;
+        }
+      }
+
+      const vizeTotal = unitCfg.vizeUnits.length;
+      const finalTotal = unitCfg.finalUnits.length;
+
       return {
         vizeCompleted,
-        vizeTotal: VIZE_UNIT_LIMIT,
-        vizePercent: Math.round((vizeCompleted / VIZE_UNIT_LIMIT) * 100),
+        vizeTotal,
+        vizePercent: vizeTotal > 0 ? Math.round((vizeCompleted / vizeTotal) * 100) : 0,
         finalCompleted,
-        finalTotal: TOTAL_UNITS,
-        finalPercent: Math.round((finalCompleted / TOTAL_UNITS) * 100),
+        finalTotal,
+        finalPercent: finalTotal > 0 ? Math.round((finalCompleted / finalTotal) * 100) : 0,
       };
     },
-    [state.units]
+    [state.courses, state.units]
   );
 
   const value = useMemo<CoachContextValue>(
@@ -730,6 +786,7 @@ export function CoachProvider({ children }: { children: React.ReactNode }) {
       selectedCourse,
       currentUnitRecord,
       addCourse,
+      updateCourseUnitConfig,
       deleteCourse,
       loadSampleCurriculum,
       updateUnitText,
@@ -767,6 +824,7 @@ export function CoachProvider({ children }: { children: React.ReactNode }) {
       selectedCourse,
       currentUnitRecord,
       addCourse,
+      updateCourseUnitConfig,
       deleteCourse,
       loadSampleCurriculum,
       updateUnitText,

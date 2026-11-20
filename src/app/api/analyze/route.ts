@@ -358,6 +358,7 @@ export async function POST(req: NextRequest) {
       courseName?: string;
       category?: CourseCategory;
       unitNumber?: number;
+      examScopeLabel?: string;
       unitText?: string;
       contentMode?: "auto" | "full_unit" | "summary";
       preferredProvider?: AiProviderPreference;
@@ -442,7 +443,7 @@ ${categorySpecificRule}${fullUnitNote}`;
         : "";
 
     const prompt = `Ders Adı: ${courseName}
-Ünite Numarası: ${unitNumber} (${unitNumber <= 4 ? "Vize + Final Kapsamı" : "Final Kapsamı"})
+Ünite Numarası: ${unitNumber} (${body.examScopeLabel?.trim() || (unitNumber <= 4 ? "Vize + Final Kapsamı" : "Final Kapsamı")})
 Kategori: ${effectiveCategory === "teknik" ? "Teknik / Kodlama / Uygulamalı" : "Sözel / Kavramsal"}
 İçerik Tipi: ${isFullUnit ? "Tam Ünite Metni (Kapsamlı)" : "Ünite Özeti / Ders Notu"}${checklistBlock}
 

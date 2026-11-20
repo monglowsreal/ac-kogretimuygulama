@@ -8,8 +8,8 @@ Her bölüm ve sınıftan öğrencinin **kendi derslerini ekleyip** ünite PDF/d
 
 ## Öne Çıkan Özellikler
 
-- **Serbest Ders Ekleme & Otomatik Kategori Algılama:**
-  - Uygulama temiz başlar; herkes sol panelden veya ana ekrandan kendi ders adını ve kodunu yazarak **Sözel / Kavramsal** veya **Teknik / Kodlama** dersi ekleyip 1–8. ünitelerini yönetebilir (isteğe bağlı 1 tıkla örnek 6 derslik demo müfredat da yüklenebilir).
+- **Serbest Ders Ekleme, Özel Ünite Sayısı & Otomatik Kategori Algılama:**
+  - Uygulama temiz başlar; herkes sol panelden veya ana ekrandan kendi ders adını ve kodunu yazarak **Sözel / Kavramsal** veya **Teknik / Kodlama** dersi ekleyip **ünite sayısını (1–24)** ve **hangi ünitelerin Vize / Final'de çıkacağını** dilediği gibi özelleştirebilir (isteğe bağlı 1 tıkla örnek 6 derslik demo müfredat da yüklenebilir).
   - Eklenen dersin adına veya ünite metnine göre Sözel / Teknik strateji otomatik algılanır.
 - **Modül 1 — Ünite İçeriği Yükleme:**
   - Doğrudan metin yapıştırma, `.txt` veya `.pdf` yükleme (`unpdf` ile sunucu taraflı metin çıkarma).
@@ -24,7 +24,7 @@ Her bölüm ve sınıftan öğrencinin **kendi derslerini ekleyip** ünite PDF/d
   - **Anında Cevap & Açıklama** (varsayılan) veya **Cevaplar Sonda** modu; her şık için *Neden Doğru / Neden Yanlış* açıklaması ve ünite dayanağı.
   - Resmi AÖF net hesabı (**4 yanlış 1 doğruyu götürür**: `Doğru - Yanlış / 4`) + *Boş Bırak* stratejisi.
 - **Modül 4 — Çoklu Ünite Deneme Sınavı, Yanlış Defteri & A4 Çıktı:**
-  - Vize (1–4) / Final (5–8) veya seçili ünitelerle süreli karma deneme sınavı.
+  - Dersin belirlediğin Vize / Final ünite aralığına veya özel ünite seçimlerine göre süreli karma deneme sınavı.
   - Yanlış yapılan soruların **1., 3., 7. ve 14. gün** aralıklı tekrar takvimiyle **Yanlış Defteri**'ne eklenmesi ve tek tıkla zayıf konu tekrar quizi.
   - **A4 Kağıdı Çıktısı & PDF / HTML İndirme:** Beyaz kâğıt düzeninde tek ünite veya çoklu ünite A4 önizleme, 1 sütun / 2 sütun sıkı özet, yazdırma (`PDF olarak kaydet`) ve tek dosya `.html` dışa aktarma.
 

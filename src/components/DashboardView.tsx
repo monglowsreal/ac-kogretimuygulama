@@ -17,11 +17,18 @@ import {
   Clock,
   FileCheck2,
   Play,
+  SlidersHorizontal,
 } from "lucide-react";
-import { TOTAL_UNITS, VIZE_UNIT_LIMIT } from "@/data/courses";
+import {
+  CourseUnitConfigModal,
+  CourseUnitDraft,
+  CourseUnitScopeFields,
+  createDefaultUnitDraft,
+} from "@/components/CourseUnitConfigModal";
 import { useCoach } from "@/context/CoachContext";
 import { getDaysRemaining } from "@/lib/classifier";
-import { CourseCategory } from "@/types/coach";
+import { getCourseUnitConfig, getUnitExamInfo } from "@/lib/course-units";
+import { Course, CourseCategory } from "@/types/coach";
 
 const STAGE_LABELS = ["1. Gün", "3. Gün", "7. Gün", "14. Gün"] as const;
 
@@ -51,6 +58,10 @@ export function DashboardView() {
   const [quickCategory, setQuickCategory] = useState<CourseCategory | "auto">(
     "auto"
   );
+  const [quickUnitDraft, setQuickUnitDraft] = useState<CourseUnitDraft>(() =>
+    createDefaultUnitDraft()
+  );
+  const [editingCourse, setEditingCourse] = useState<Course | null>(null);
 
   const handleQuickAddCourse = (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,11 +70,13 @@ export function DashboardView() {
       quickCourseName,
       quickCategory === "auto" ? undefined : quickCategory,
       undefined,
-      quickCourseCode
+      quickCourseCode,
+      quickUnitDraft
     );
     setQuickCourseName("");
     setQuickCourseCode("");
     setQuickCategory("auto");
+    setQuickUnitDraft(createDefaultUnitDraft());
     selectCourse(created.id, 1, "upload");
   };
 
@@ -116,7 +129,8 @@ export function DashboardView() {
           </h2>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
             Sol panelden veya aşağıdan istediğin dersi ekleyip ünitelerini
-            yükle; Vize (1–4) ve Final (1–8) hazırlığını tek ekrandan yönet.
+            yükle; derslerin kendi ünite sayısı ve Vize / Final kapsamına göre
+            hazırlığını tek ekrandan yönet.
           </p>
         </div>
 
@@ -197,7 +211,7 @@ export function DashboardView() {
             <div>
               <span className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-600 dark:text-amber-400">
                 <Target className="h-3.5 w-3.5" />
-                Vize Kapsamı • İlk 4 Ünite
+                Vize Kapsamı • Seçili Üniteler
               </span>
               <h3 className="mt-3 text-lg font-bold text-slate-900 dark:text-white">
                 Ara Sınava{" "}
@@ -235,7 +249,7 @@ export function DashboardView() {
             <div>
               <span className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-500/10 px-2.5 py-1 text-xs font-semibold text-indigo-600 dark:text-indigo-400">
                 <Target className="h-3.5 w-3.5" />
-                Final Kapsamı • Tüm 8 Ünite
+                Final Kapsamı • Seçili Üniteler
               </span>
               <h3 className="mt-3 text-lg font-bold text-slate-900 dark:text-white">
                 Final Sınavına{" "}
@@ -304,49 +318,59 @@ export function DashboardView() {
 
             <form
               onSubmit={handleQuickAddCourse}
-              className="mt-4 grid gap-3 sm:grid-cols-4"
+              className="mt-4 space-y-3"
             >
-              <input
-                type="text"
-                value={quickCourseName}
-                onChange={(e) => setQuickCourseName(e.target.value)}
-                placeholder="Ders adı (örn: Genel Muhasebe)"
-                className="rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-900 focus:border-indigo-500 focus:outline-none sm:col-span-2 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-              />
-              <div className="flex gap-2">
+              <div className="grid gap-3 sm:grid-cols-4">
                 <input
                   type="text"
-                  value={quickCourseCode}
-                  onChange={(e) => setQuickCourseCode(e.target.value)}
-                  placeholder="Kod (örn: MUH101)"
-                  className="w-1/2 rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                  value={quickCourseName}
+                  onChange={(e) => setQuickCourseName(e.target.value)}
+                  placeholder="Ders adı (örn: Genel Muhasebe)"
+                  className="rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-900 focus:border-indigo-500 focus:outline-none sm:col-span-2 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                 />
-                <select
-                  value={quickCategory}
-                  onChange={(e) =>
-                    setQuickCategory(e.target.value as CourseCategory | "auto")
-                  }
-                  className="w-1/2 rounded-xl border border-slate-300 bg-slate-50 px-2 py-2 text-xs text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={quickCourseCode}
+                    onChange={(e) => setQuickCourseCode(e.target.value)}
+                    placeholder="Kod (örn: MUH101)"
+                    className="w-1/2 rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                  />
+                  <select
+                    value={quickCategory}
+                    onChange={(e) =>
+                      setQuickCategory(e.target.value as CourseCategory | "auto")
+                    }
+                    className="w-1/2 rounded-xl border border-slate-300 bg-slate-50 px-2 py-2 text-xs text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                  >
+                    <option value="auto">Otomatik</option>
+                    <option value="sozel">Sözel</option>
+                    <option value="teknik">Teknik</option>
+                  </select>
+                </div>
+                <button
+                  type="submit"
+                  disabled={!quickCourseName.trim()}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-500 disabled:opacity-50"
                 >
-                  <option value="auto">Otomatik</option>
-                  <option value="sozel">Sözel</option>
-                  <option value="teknik">Teknik</option>
-                </select>
+                  Dersi Ekle &amp; Yükle
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </button>
               </div>
-              <button
-                type="submit"
-                disabled={!quickCourseName.trim()}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-500 disabled:opacity-50"
-              >
-                Dersi Ekle &amp; Yükle
-                <ArrowRight className="h-3.5 w-3.5" />
-              </button>
+              <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 dark:border-slate-800 dark:bg-slate-950/40">
+                <CourseUnitScopeFields
+                  value={quickUnitDraft}
+                  onChange={setQuickUnitDraft}
+                  compact
+                />
+              </div>
             </form>
           </div>
         ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {state.courses.map((course) => {
             const progress = getCourseProgress(course.id);
+            const unitCfg = getCourseUnitConfig(course);
             const isTech = course.category === "teknik";
             return (
               <div
@@ -387,10 +411,10 @@ export function DashboardView() {
                     <div>
                       <div className="mb-1 flex justify-between text-[11px]">
                         <span className="font-medium text-slate-600 dark:text-slate-300">
-                          Vize (1–4. Ünite)
+                          Vize ({unitCfg.vizeLabel})
                         </span>
                         <span className="font-semibold text-amber-600 dark:text-amber-400">
-                          %{progress.vizePercent} ({progress.vizeCompleted}/4)
+                          %{progress.vizePercent} ({progress.vizeCompleted}/{progress.vizeTotal})
                         </span>
                       </div>
                       <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
@@ -403,10 +427,10 @@ export function DashboardView() {
                     <div>
                       <div className="mb-1 flex justify-between text-[11px]">
                         <span className="font-medium text-slate-600 dark:text-slate-300">
-                          Final (1–8. Ünite)
+                          Final ({unitCfg.finalLabel})
                         </span>
                         <span className="font-semibold text-indigo-600 dark:text-indigo-400">
-                          %{progress.finalPercent} ({progress.finalCompleted}/8)
+                          %{progress.finalPercent} ({progress.finalCompleted}/{progress.finalTotal})
                         </span>
                       </div>
                       <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
@@ -418,42 +442,55 @@ export function DashboardView() {
                     </div>
                   </div>
 
-                  {/* 8 Ünite Durum Kutucukları */}
+                  {/* Dinamik Ünite Durum Kutucukları */}
                   <div className="mt-4">
-                    <div className="grid grid-cols-8 gap-1.5">
-                      {Array.from({ length: TOTAL_UNITS }, (_, i) => i + 1).map(
-                        (unitNum) => {
-                          const rec = getUnitRecord(course.id, unitNum);
-                          const hasContent =
-                            rec.rawText.trim().length > 0 || Boolean(rec.guide);
-                          const isVize = unitNum <= VIZE_UNIT_LIMIT;
-                          return (
-                            <button
-                              key={unitNum}
-                              type="button"
-                              onClick={() => selectCourse(course.id, unitNum, "upload")}
-                              title={`Ünite ${unitNum} (${
-                                isVize ? "Vize" : "Final"
-                              })${rec.completed ? " • Tamamlandı" : ""}`}
-                              className={`flex h-8 items-center justify-center rounded-lg text-xs font-semibold transition ${
-                                rec.completed
-                                  ? "bg-emerald-500 text-white shadow-xs"
-                                  : hasContent
-                                    ? "bg-indigo-500/15 text-indigo-600 ring-1 ring-indigo-500/40 dark:text-indigo-300"
-                                    : isVize
-                                      ? "bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 dark:text-amber-300"
-                                      : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700"
-                              }`}
-                            >
-                              {unitNum}
-                            </button>
-                          );
-                        }
-                      )}
+                    <div className="grid grid-cols-6 gap-1.5 sm:grid-cols-8">
+                      {unitCfg.unitNumbers.map((unitNum) => {
+                        const rec = getUnitRecord(course.id, unitNum);
+                        const hasContent =
+                          rec.rawText.trim().length > 0 || Boolean(rec.guide);
+                        const uExam = getUnitExamInfo(
+                          unitNum,
+                          unitCfg.vizeSet,
+                          unitCfg.finalSet
+                        );
+                        return (
+                          <button
+                            key={unitNum}
+                            type="button"
+                            onClick={() => selectCourse(course.id, unitNum, "upload")}
+                            title={`Ünite ${unitNum} (${uExam.badgeText})${
+                              rec.completed ? " • Tamamlandı" : ""
+                            }`}
+                            className={`flex h-8 items-center justify-center rounded-lg text-xs font-semibold transition ${
+                              rec.completed
+                                ? "bg-emerald-500 text-white shadow-xs"
+                                : hasContent
+                                  ? "bg-indigo-500/15 text-indigo-600 ring-1 ring-indigo-500/40 dark:text-indigo-300"
+                                  : uExam.inVize
+                                    ? "bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 dark:text-amber-300"
+                                    : uExam.inFinal
+                                      ? "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700"
+                                      : "border border-dashed border-slate-300/70 bg-transparent text-slate-400 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-500"
+                            }`}
+                          >
+                            {unitNum}
+                          </button>
+                        );
+                      })}
                     </div>
-                    <div className="mt-1.5 flex justify-between text-[10px] text-slate-400">
-                      <span>1–4 Vize</span>
-                      <span>5–8 Final</span>
+                    <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[10px] text-slate-400">
+                      <span className="truncate">
+                        {unitCfg.totalUnits} ünite • V: {unitCfg.vizeLabel} • F: {unitCfg.finalLabel}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setEditingCourse(course)}
+                        className="inline-flex shrink-0 items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 transition hover:bg-indigo-500/15 hover:text-indigo-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:text-indigo-300"
+                      >
+                        <SlidersHorizontal className="h-3 w-3" />
+                        Ünite Ayarı
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -663,6 +700,13 @@ export function DashboardView() {
           </div>
         )}
       </div>
+
+      {editingCourse && (
+        <CourseUnitConfigModal
+          course={editingCourse}
+          onClose={() => setEditingCourse(null)}
+        />
+      )}
     </div>
   );
 }

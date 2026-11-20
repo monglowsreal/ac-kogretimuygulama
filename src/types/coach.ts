@@ -59,6 +59,12 @@ export interface Course {
   category: CourseCategory;
   description: string;
   isCustom?: boolean;
+  /** Dersin toplam ünite sayısı (varsayılan: 8, aralık: 1-24) */
+  totalUnits?: number;
+  /** Vizede çıkacak ünite numaraları */
+  vizeUnits?: number[];
+  /** Finalde çıkacak ünite numaraları */
+  finalUnits?: number[];
 }
 
 export interface CriticalConcept {

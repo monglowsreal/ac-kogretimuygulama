@@ -3,13 +3,13 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Download, Printer, X } from "lucide-react";
-import { TOTAL_UNITS, VIZE_UNIT_LIMIT } from "@/data/courses";
 import { useCoach } from "@/context/CoachContext";
 import {
   A4_DOCUMENT_CSS,
   buildStandaloneA4Html,
   slugifyFileName,
 } from "@/lib/a4-export";
+import { getCourseUnitConfig, getUnitExamInfo } from "@/lib/course-units";
 import { Course, StudyGuide, UnitRecord } from "@/types/coach";
 
 interface A4PrintModalProps {
@@ -53,7 +53,8 @@ function renderUnitGuideHtml(
   }
 ) {
   const isTeknik = (guide.detectedCategory || course.category) === "teknik";
-  const isVize = unitNum <= VIZE_UNIT_LIMIT;
+  const unitCfg = getCourseUnitConfig(course);
+  const examInfo = getUnitExamInfo(unitNum, unitCfg.vizeSet, unitCfg.finalSet);
   const meaningfulVerification = filterMeaningfulNotes(guide.verificationNotes);
 
   return (
@@ -69,9 +70,7 @@ function renderUnitGuideHtml(
         </div>
         <div className="a4-doc-meta">
           <div>
-            <span className="a4-badge">
-              {isVize ? "Vize + Final (1–4)" : "Final (5–8)"}
-            </span>
+            <span className="a4-badge">{examInfo.badgeText}</span>
             <span className="a4-badge">{isTeknik ? "Teknik" : "Sözel"}</span>
           </div>
           <div style={{ marginTop: "4px" }}>
@@ -327,10 +326,8 @@ export function A4PrintModal({
 
   if (!open || typeof document === "undefined") return null;
 
-  const allUnits: PrintableUnitItem[] = Array.from(
-    { length: TOTAL_UNITS },
-    (_, i) => i + 1
-  ).map((u) => ({
+  const unitCfg = getCourseUnitConfig(course);
+  const allUnits: PrintableUnitItem[] = unitCfg.unitNumbers.map((u) => ({
     unitNumber: u,
     record: getUnitRecord(course.id, u),
   }));
@@ -353,14 +350,15 @@ export function A4PrintModal({
     );
   };
 
-  const applyPreset = (mode: "single" | "vize" | "all") => {
+  const applyPreset = (mode: "single" | "vize" | "final" | "all") => {
     if (mode === "single") {
       setSelectedUnits([initialUnitNumber]);
       return;
     }
     const matching = allUnits
       .filter((item) => {
-        if (mode === "vize" && item.unitNumber > VIZE_UNIT_LIMIT) return false;
+        if (mode === "vize" && !unitCfg.vizeSet.has(item.unitNumber)) return false;
+        if (mode === "final" && !unitCfg.finalSet.has(item.unitNumber)) return false;
         return Boolean(
           item.record.guide ||
             (includeRawFallback && item.record.rawText.trim().length >= 50)
@@ -508,8 +506,17 @@ export function A4PrintModal({
               onClick={() => applyPreset("vize")}
               className="rounded-lg bg-slate-800 px-2 py-1 text-[11px] text-amber-300 hover:bg-slate-700"
             >
-              Vize (1–4)
+              Vize ({unitCfg.vizeLabel})
             </button>
+            {unitCfg.finalUnits.length < unitCfg.totalUnits && (
+              <button
+                type="button"
+                onClick={() => applyPreset("final")}
+                className="rounded-lg bg-slate-800 px-2 py-1 text-[11px] text-indigo-300 hover:bg-slate-700"
+              >
+                Final ({unitCfg.finalLabel})
+              </button>
+            )}
             <button
               type="button"
               onClick={() => applyPreset("all")}
