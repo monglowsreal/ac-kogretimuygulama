@@ -11,6 +11,8 @@ import {
   ComprehensionPromptItem,
 } from "@/types/coach";
 
+export const maxDuration = 60;
+
 const generatePromptsSchema: JsonSchemaNode = {
   type: "object",
   additionalProperties: false,

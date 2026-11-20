@@ -70,7 +70,17 @@ export function UnitInputTab({
           method: "POST",
           body: formData,
         });
-        const data = (await res.json()) as {
+        const contentType = res.headers.get("content-type") ?? "";
+        const data = (
+          contentType.includes("application/json")
+            ? await res.json()
+            : {
+                error:
+                  res.status === 413
+                    ? "Bu PDF dosyası web sunucusu boyut sınırını (4,5 MB) aşıyor. PDF içindeki metni kopyalayıp aşağıdaki alana yapıştırabilirsiniz."
+                    : `Sunucudan beklenmeyen yanıt alındı (HTTP ${res.status}).`,
+              }
+        ) as {
           text?: string;
           totalPages?: number;
           warning?: string;

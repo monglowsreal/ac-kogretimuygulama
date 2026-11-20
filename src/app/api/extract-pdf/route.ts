@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { extractText } from "unpdf";
 
+export const maxDuration = 60;
+
 const MAX_PDF_BYTES = 250 * 1024 * 1024; // Büyük ders/ünite PDF'leri için 250 MB sınır
 
 export async function POST(req: NextRequest) {

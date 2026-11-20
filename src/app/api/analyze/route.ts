@@ -15,6 +15,8 @@ import {
   StudySectionNote,
 } from "@/types/coach";
 
+export const maxDuration = 60;
+
 const sectionNoteSchema: JsonSchemaNode = {
   type: "object",
   additionalProperties: false,

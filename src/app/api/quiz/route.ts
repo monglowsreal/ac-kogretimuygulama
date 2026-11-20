@@ -17,6 +17,8 @@ import {
   StudyGuide,
 } from "@/types/coach";
 
+export const maxDuration = 60;
+
 const VALID_KEYS: QuizOptionKey[] = ["A", "B", "C", "D", "E"];
 const VALID_TYPES: QuizQuestionType[] = [
   "bilgi",

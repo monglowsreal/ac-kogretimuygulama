@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "license": "MIT",
+  "engines": {
+    "node": "24.x"
+  },
   "description": "AÖF Bilgisayar Programcılığı 1. Sınıf Güz Dönemi Akıllı Çalışma Koçu",
   "main": "electron/main.cjs",
   "scripts": {
