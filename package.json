@@ -15,7 +15,7 @@
     "desktop": "npm run desktop:prepare && electron .",
     "desktop:app": "node scripts/launch-app.mjs",
     "desktop:dev": "electron . --dev",
-    "desktop:build": "npm run desktop:prepare && electron-builder --win",
+    "desktop:build": "npm run desktop:prepare && electron-builder --win --publish never",
     "release:zip": "npm run desktop:prepare && node scripts/package-release.mjs"
   },
   "build": {

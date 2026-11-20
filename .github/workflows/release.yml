@@ -29,7 +29,7 @@ jobs:
         run: npm run release:zip
 
       - name: Electron Windows paketlerini oluştur (Kurulum + Portable + ZIP)
-        run: npm run desktop:prepare && npx electron-builder --win nsis portable zip
+        run: npm run desktop:prepare && npx electron-builder --win nsis portable zip --publish never
 
       - name: GitHub Release olarak yayınla
         uses: softprops/action-gh-release@v2
