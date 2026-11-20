@@ -30,15 +30,31 @@ Her bölüm ve sınıftan öğrencinin **kendi derslerini ekleyip** ünite PDF/d
 
 ---
 
-## Tek Tıkla İndir & Başlat (Windows)
+## En Sorunsuz Kurulum & Kullanım (Windows 11 Akıllı Uygulama Denetimi Dostu)
 
-Hiç terminal veya kod düzenlemesi yapmadan çalıştırmak için:
+> **Not:** Windows 11'de **Akıllı Uygulama Denetimi (Smart App Control)** açık olan bilgisayarlarda ticari kod imzası bulunmayan internetten indirilmiş `.exe` veya `.cmd`/`.bat` dosyaları engellenebilir. Aşağıdaki **1. ve 2. yöntem** bu engelle karşılaşmadan çalışır:
 
-1. [Releases sayfasından](https://github.com/monglowsreal/ac-kogretimuygulama/releases/latest) **`AOF-Akilli-Calisma-Kocu-Hazir-Paket.zip`** dosyasını indirip klasöre çıkarın *(alternatif olarak Electron tabanlı `AOF-Akilli-Calisma-Kocu-Portable.exe` dosyasını da indirebilirsiniz)*.
-2. Bilgisayarınızda [Node.js LTS](https://nodejs.org/) kurulu değilse tek seferliğine kurun *(Edge ile Windows 11 Akıllı Uygulama Denetimi'ne takılmadan çalışması için kullanılır)*.
-3. Klasördeki **`BASLAT.cmd`** dosyasına çift tıklayın — uygulama ayrı pencere olarak açılır. *(İsterseniz `Masaustu_Kisayolu_Olustur.cmd` ile masaüstüne simge de oluşturabilirsiniz.)*
-4. Açılan ekrandaki **"API Anahtarı Gir"** butonundan elinizdeki herhangi bir AI API anahtarını (**Gemini, OpenAI, Claude, Groq, OpenRouter, DeepSeek, EVREN** veya **Ollama**) yapıştırıp kaydedin.
-5. Sol panelden kendi dersinizi yazıp ünite PDF/metinlerinizi yüklemeye başlayın!
+### 1) Ücretsiz Web / Vercel + Tek Tıkla Masaüstü Uygulaması (Önerilen)
+* [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fmonglowsreal%2Fac-kogretimuygulama)
+* Yayına alınan web adresini **Microsoft Edge** veya **Chrome** ile açtığınızda adres çubuğundaki **"Uygulama Olarak Yükle"** simgesine tıklayarak hiçbir `.exe` veya `.cmd` indirmeden masaüstünüze ayrı pencere olarak kurabilirsiniz.
+* Siteye giren her ziyaretçi kendi AI API anahtarını (**Gemini, OpenAI, Claude, Groq, OpenRouter, DeepSeek, EVREN**) yalnızca kendi tarayıcısında saklayarak kullanır; veriler kullanıcıya özel kalır.
+
+### 2) Kendi Bilgisayarında Git + İmzalı Node/Edge ile Başlatma (Windows 11 Engeline Takılmaz)
+Bilgisayarınızda [Git](https://git-scm.com/) ve [Node.js LTS](https://nodejs.org/) kuruluysa PowerShell / terminalde şu adımları çalıştırın:
+```powershell
+git clone https://github.com/monglowsreal/ac-kogretimuygulama.git
+cd ac-kogretimuygulama
+npm install
+npm run desktop:prepare
+npm run desktop:app
+```
+Microsoft dijital imzalı `node.exe` + Microsoft Edge Uygulama Modu (`--app`) ile ayrı masaüstü penceresi olarak açılır (`node scripts/create-shortcut.mjs` ile masaüstü kısayolu da oluşturabilirsiniz).
+
+### 3) Windows Kurulum Sihirbazı / Taşınabilir Paketler (Releases)
+* [Releases sayfasından](https://github.com/monglowsreal/ac-kogretimuygulama/releases/latest):
+  * **`AOF-Akilli-Calisma-Kocu-Kurulum.exe`**: Standart Windows kurulum sihirbazıdır; bilgisayara kurar ve **Masaüstü + Başlat Menüsü kısayolu** oluşturur.
+  * **`AOF-Akilli-Calisma-Kocu-Portable.exe`** veya **`AOF-Akilli-Calisma-Kocu-Hazir-Paket.zip`**: Kurulumsuz taşınabilir paketler.
+  * *(Not: Ücretli Code Signing sertifikası olmadığı için Windows 11 **Akıllı Uygulama Denetimi** açık cihazlarda imzasız `.exe`/`.cmd` dosyaları engellenebilir; bu durumda yukarıdaki 1. veya 2. yöntemi kullanın.)*
 
 ---
 
@@ -48,7 +64,7 @@ Hiç terminal veya kod düzenlemesi yapmadan çalıştırmak için:
    ```bash
    npm install
    ```
-2. Kök dizindeki `.env.example` dosyasını `.env.local` adıyla kopyalayıp kendi API anahtarınızı yazın *(veya uygulamayı açtıktan sonra arayüzdeki "API & EVREN Ayarları" ekranından girin)*:
+2. Kök dizindeki `.env.example` dosyasını `.env.local` adıyla kopyalayıp kendi API anahtarınızı yazın *(veya uygulamayı açtıktan sonra arayüzdeki **"API & AI Ayarları"** ekranından herhangi bir sağlayıcı anahtarını girin)*:
    ```env
    GEMINI_API_KEY=buraya_kendi_gemini_api_anahtarinizi_yazin
    # İsteğe bağlı otomatik yedek:

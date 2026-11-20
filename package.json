@@ -50,6 +50,16 @@
         "zip"
       ]
     },
+    "nsis": {
+      "artifactName": "AOF-Akilli-Calisma-Kocu-Kurulum.exe",
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "AÖF Akıllı Çalışma Koçu",
+      "runAfterFinish": true
+    },
     "portable": {
       "artifactName": "AOF-Akilli-Calisma-Kocu-Portable.exe"
     }
