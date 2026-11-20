@@ -1,0 +1,41 @@
+name: Release Windows Packages
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Depoyu indir
+        uses: actions/checkout@v4
+
+      - name: Node.js kur
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Bağımlılıkları yükle
+        run: npm ci
+
+      - name: Standalone hazır paket oluştur
+        run: npm run release:zip
+
+      - name: Electron Windows paketlerini oluştur
+        run: npm run desktop:build
+
+      - name: GitHub Release olarak yayınla
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            dist-release/AOF-Akilli-Calisma-Kocu-Hazir-Paket.zip
+            dist-electron/AOF-Akilli-Calisma-Kocu-Portable.exe
+            dist-electron/*.zip
