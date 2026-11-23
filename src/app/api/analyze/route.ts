@@ -105,31 +105,31 @@ function buildStudyGuideSchema(studyPlan: JsonSchemaNode): JsonSchemaNode {
       unitSummary: {
         type: "string",
         description:
-          "Ünitenin öğrenci dostu, metne tam sadık genel çerçeve özeti (2-3 paragraf).",
+          "Ünitenin metne tam sadık, yoğun tek paragraflık özeti (en fazla 2-3 kısa cümle, 45-65 kelime).",
       },
       sectionNotes: {
         type: "array",
         items: sectionNoteSchema,
         description:
-          "Ünitenin başından sonuna TÜM ana başlık ve alt başlıklarını sırayla kapsayan çalışma notları. Bir başlık altında 10-15 madde/tür varsa HER BİRİNİ eksiksiz kapsa; hiçbir türü, adımı veya son sayfalardaki konuyu atlama!",
+          "Ünitedeki tüm önemli konuları tek bir A4 sayfasına sığacak biçimde 4-6 kompakt ana başlıkta toplayan yoğun çalışma notları. Benzer alt başlıkları birleştir, her başlıkta en fazla 3-5 kısa tek satırlık somut madde ver; dolgu cümle yazma.",
       },
       comparisonTables: {
         type: "array",
         items: comparisonTableSchema,
         description:
-          "Metinde karşılaştırma veya sınıflandırma varsa net tablo kartları (yoksa boş dizi [])",
+          "Metinde kritik bir karşılaştırma/sınıflandırma varsa en fazla 1 kompakt tablo (en fazla 4-5 kısa satır; yoksa boş dizi []).",
       },
       criticalDetails: {
         type: "array",
         items: { type: "string" },
         description:
-          "Sınavda Çıkabilecek Kritik Ayrıntılar: tarihler, sayılar, istisnalar, 'ancak/yalnızca/hariç/en az-en çok' sınırlamaları ve ince ayrımlar (5-12 madde).",
+          "Sınavda Çıkabilecek Kritik Ayrıntılar: tarihler, sayılar, istisnalar, 'ancak/yalnızca/hariç' sınırlamaları (4-6 adet kısa tek satırlık madde).",
       },
       criticalConcepts: {
         type: "array",
         items: criticalConceptSchema,
         description:
-          "Ünitedeki tüm kritik kavram, kişi ve terimleri kapsayan kartlar (sayı kısıtlaması yok; üniteye göre 6-18 arası).",
+          "Ünitedeki en kritik kavram, kişi ve terimler (5-6 kart; her tanım ve sınav ipucu tek kısa cümle).",
       },
       verificationNotes: {
         type: "array",
@@ -313,19 +313,42 @@ function normalizeComparisonTables(
 
 function normalizeStudyGuide(
   parsed: RawStudyGuidePayload,
-  effectiveCategory: CourseCategory
+  effectiveCategory: CourseCategory,
+  isOnePage: boolean
 ): Omit<StudyGuide, "generatedAt" | "aiMeta" | "coverageReport"> {
   const plan = parsed.studyPlan;
+  const maxSections = isOnePage ? 7 : 40;
+  const maxTables = isOnePage ? 2 : 6;
+  const maxDetails = isOnePage ? 7 : 20;
+  const maxConcepts = isOnePage ? 8 : 25;
+
+  const normalizedSections = normalizeSectionNotes(parsed.sectionNotes)
+    .slice(0, maxSections)
+    .map((sec) =>
+      isOnePage
+        ? {
+            ...sec,
+            whatToKnow: sec.whatToKnow.slice(0, 6),
+            examKeywords: sec.examKeywords.slice(0, 5),
+          }
+        : sec
+    );
+
   return {
     unitSummary: parsed.unitSummary?.trim() || "Ünite özeti oluşturuldu.",
     detectedCategory: effectiveCategory,
-    sectionNotes: normalizeSectionNotes(parsed.sectionNotes),
-    comparisonTables: normalizeComparisonTables(parsed.comparisonTables),
+    sectionNotes: normalizedSections,
+    comparisonTables: normalizeComparisonTables(parsed.comparisonTables)?.slice(
+      0,
+      maxTables
+    ),
     criticalDetails: Array.isArray(parsed.criticalDetails)
-      ? parsed.criticalDetails.filter((d) => typeof d === "string" && d.trim())
+      ? parsed.criticalDetails
+          .filter((d) => typeof d === "string" && d.trim())
+          .slice(0, maxDetails)
       : [],
     criticalConcepts: Array.isArray(parsed.criticalConcepts)
-      ? parsed.criticalConcepts.slice(0, 25)
+      ? parsed.criticalConcepts.slice(0, maxConcepts)
       : [],
     verificationNotes:
       Array.isArray(parsed.verificationNotes) && parsed.verificationNotes.length > 0
@@ -337,18 +360,20 @@ function normalizeStudyGuide(
         (effectiveCategory === "teknik"
           ? "Teknik Çalışma Stratejisi"
           : "Sözel Çalışma Stratejisi"),
-      actionSteps: Array.isArray(plan?.actionSteps) ? plan.actionSteps : [],
+      actionSteps: Array.isArray(plan?.actionSteps)
+        ? plan.actionSteps.slice(0, isOnePage ? 3 : 8)
+        : [],
       memorizationTips: Array.isArray(plan?.memorizationTips)
-        ? plan.memorizationTips
+        ? plan.memorizationTips.slice(0, isOnePage ? 2 : 8)
         : undefined,
       keyDefinitionsFocus: Array.isArray(plan?.keyDefinitionsFocus)
-        ? plan.keyDefinitionsFocus
+        ? plan.keyDefinitionsFocus.slice(0, isOnePage ? 3 : 8)
         : undefined,
       codeBreakdowns: Array.isArray(plan?.codeBreakdowns)
-        ? plan.codeBreakdowns
+        ? plan.codeBreakdowns.slice(0, isOnePage ? 2 : 8)
         : undefined,
       practiceTasks: Array.isArray(plan?.practiceTasks)
-        ? plan.practiceTasks
+        ? plan.practiceTasks.slice(0, isOnePage ? 2 : 6)
         : undefined,
     },
   };
@@ -363,6 +388,7 @@ export async function POST(req: NextRequest) {
       examScopeLabel?: string;
       unitText?: string;
       contentMode?: "auto" | "full_unit" | "summary";
+      noteStyle?: "one_page" | "detailed";
       preferredProvider?: AiProviderPreference;
       evrenModel?: string;
       clientAiConfig?: ClientAiOverride;
@@ -395,6 +421,7 @@ export async function POST(req: NextRequest) {
         ? body.category
         : classifyCourseCategory(courseName, unitText);
 
+    const isOnePage = body.noteStyle !== "detailed";
     const isFullUnit =
       body.contentMode === "full_unit" ||
       (body.contentMode !== "summary" && unitText.length >= 6000);
@@ -407,7 +434,25 @@ export async function POST(req: NextRequest) {
         ? detectedHeadings
         : [];
 
-    const coreRules = `
+    const coreRules = isOnePage
+      ? `
+1. KAYNAĞA %100 SADAKAT (EN ÖNEMLİ KURAL):
+   - Yalnızca verilen ünite metnine dayan. Metinde olmayan tarihi, kişiyi, kodu, formülü veya dış bilgiyi kendi bilginden ekleme!
+   - Metinde bilgi eksikse uydurma; emin değilsen "kitaptan kontrol et" diye belirt.
+
+2. TEK SAYFA A4 KURALI (ÇOK ÖNEMLİ — ZORUNLU):
+   - Üreteceğin tüm çalışma notu çıktısı TEK BİR A4 SAYFASINA sığacak yoğunlukta ve toplamda yaklaşık 450–650 kelime civarında olmalıdır. Uzun, dağınık, sayfalara taşan anlatımlar YASAK!
+   - TEKRAR YAPMA: Aynı bilgiyi hem özette, hem bölüm notlarında, hem kritik ayrıntılarda, hem kavramlarda tekrar tekrar yazma; her bilgiyi en uygun yerde bir kez, kısa ve vurucu şekilde yaz.
+   - unitSummary: En fazla 2-3 kısa cümle (tek kısa paragraf).
+   - sectionNotes: Ünitenin başından sonuna tüm önemli başlıkları kapsayacak şekilde benzer küçük başlıkları birleştirip 4-6 KOMPAKT ana başlık oluştur. Her başlıkta en fazla 3-5 kısa, tek satırlık doğrudan sınav bilgisi (tarih, tanım, sınıflandırma, 'yalnızca/hariç' istisnası) yaz. "Bu bölümde X anlatılır" gibi boş ifadeler YASAK.
+   - comparisonTables: Yalnızca sınavda ayrım sorulabilecek önemli karşılaştırma varsa EN FAZLA 1 kompakt tablo (en fazla 4-5 kısa satır) çıkar.
+   - criticalDetails: 4-6 adet tek satırlık vurucu sınav ayrıntısı (tarih, sayı, sınırlayıcı istisna).
+   - criticalConcepts: 5-6 adet en kritik terim (tek kısa cümle tanım + tek kısa cümle sınav ipucu).
+   - studyPlan: 2-3 kısa uygulama adımı ve 1-2 kısa ipucu ile sınırlı tut.
+
+3. DOĞRULAMA VE DÜRÜSTLÜK:
+   - Belirsiz veya bozuk PDF satırı varsa verificationNotes içine tek satırla yaz; temiz metinde "Şüpheli nokta bulunamadı" yaz.`
+      : `
 1. KAYNAĞA %100 SADAKAT (EN ÖNEMLİ KURAL):
    - Yalnızca verilen ünite metnine dayan. Metinde olmayan tarihi, kişiyi, kodu, formülü veya dış bilgiyi kendi bilginden ekleme!
    - Metinde bir bilgi eksikse uydurma; zorunlu görürsen [Dış bilgi - kitaptan doğrula] veya "Emin değilim, kitaptan kontrol et" şeklinde açıkça belirt.
@@ -415,9 +460,9 @@ export async function POST(req: NextRequest) {
 
 2. EKSİKSİZ NOT ÇIKARMA VE LİSTE KORUMA KURALI:
    - Metnin başından sonuna TÜM ana başlıkları, alt başlıkları, türleri, sınıflandırmaları ve maddeli listeleri eksiksiz işle. ASLA ilk birkaç türü yazıp sonlardaki türleri/bölümleri atlama!
-   - Sayılan tüm liste öğelerini (ör. 6 algoritma özelliği, 11 algoritma türü, tüm HTML etiketleri, VBA nesneleri) TEK TEK adıyla ve açıklamasıyla sectionNotes içine al.
+   - Sayılan tüm liste öğelerini TEK TEK adıyla ve açıklamasıyla sectionNotes içine al.
    - Aşağıdakileri mutlaka koru: kelimesi kelimesine yakın tanımlar, tarihler/yıllar/sayılar/oranlar, kişi/kurum adları, istisnalar ve "ancak, yalnızca, hariç, en az/en çok" gibi sınırlayıcı ifadeler.
-   - Üstünkörü "bu bölümde X anlatılır" ifadesi YASAK; doğrudan öğretici somut bilgiyi yaz. Kısaltırken anlamı yumuşatma veya genelleme.
+   - Üstünkörü "bu bölümde X anlatılır" ifadesi YASAK; doğrudan öğretici somut bilgiyi yaz.
    - Karşılaştırma varsa comparisonTables içinde tablo olarak çıkar.
    - criticalDetails bölümüne "Sınavda Çıkabilecek Kritik Ayrıntılar" maddelerini ekle.
 
@@ -426,28 +471,34 @@ export async function POST(req: NextRequest) {
 
     const categorySpecificRule =
       effectiveCategory === "teknik"
-        ? `- Ders TEKNİK/KODLAMA kategorisindedir: Yalnızca metinde geçen gerçek kod bloklarını, sözde kodları, HTML/CSS etiketlerini veya Excel/VBA formüllerini codeBreakdowns içinde parçala (metinde kod bloğu yoksa dışarıdan kod uydurma, codeBreakdowns dizisini boş [] bırak veya metindeki sözdizimi kurallarını sectionNotes içinde öğret). 2-3 pratik görev (practiceTasks) üret.`
-        : `- Ders SÖZEL/KAVRAMSAL kategorisindedir: Öğrencinin karşılaştırması gereken ince tanım farklarını (keyDefinitionsFocus) ve kalıcı hafıza tekniklerini (memorizationTips) metindeki somut bilgilere dayanarak ver.`;
+        ? `- Ders TEKNİK/KODLAMA kategorisindedir: Yalnızca metinde geçen gerçek kod bloklarını veya formülleri codeBreakdowns içinde kısa ve net parçala (metinde kod bloğu yoksa codeBreakdowns dizisini boş [] bırak). ${isOnePage ? "En fazla 1-2 kısa kod bloğu ve 1-2 pratik görev ver." : "2-3 pratik görev üret."}`
+        : `- Ders SÖZEL/KAVRAMSAL kategorisindedir: İnce tanım farklarını (keyDefinitionsFocus) ve hafıza ipuçlarını (memorizationTips) metindeki somut bilgilere dayanarak kısa ve net ver.`;
 
     const fullUnitNote = isFullUnit
-      ? `\n- TAM ÜNİTE MODU: Uzun tam kitap ünitesi verilmiştir. Basım/ISBN/kaynakça/yan kutu gürültülerini ele ama son sayfalara kadar TÜM konu başlıklarını eksiksiz kapsa.`
+      ? isOnePage
+        ? `\n- TAM ÜNİTE → TEK SAYFA A4 SENTEZİ: Uzun ünite metnindeki basım/ISBN/kaynakça gürültülerini ele; ünitenin başından sonuna tüm önemli başlıkları 4-6 kompakt bölümde yoğunlaştırarak TEK A4 SAYFASINA sığdır.`
+        : `\n- TAM ÜNİTE MODU: Uzun tam kitap ünitesi verilmiştir. Basım/ISBN/kaynakça/yan kutu gürültülerini ele ama son sayfalara kadar TÜM konu başlıklarını eksiksiz kapsa.`
       : "";
 
-    const systemInstruction = `Sen AÖF ve üniversite sınavlarına hazırlanan öğrencinin titiz ve dürüst çalışma asistanısın. Her zaman Türkçe yaz.
+    const systemInstruction = `Sen AÖF ve üniversite sınavlarına hazırlanan öğrencinin titiz, özlü ve dürüst çalışma asistanısın. Her zaman Türkçe yaz.
 ${coreRules}
 ${categorySpecificRule}${fullUnitNote}`;
 
     const checklistBlock =
       checklistHeadings.length > 0
-        ? `\n\nTESPiT EDİLEN ÜNİTE BAŞLIKLARI (HİÇBİRİNİ ATLAMADAN TAMAMINI sectionNotes İÇİNDE İŞLE):\n${checklistHeadings
-            .map((h, i) => `${i + 1}. ${h}`)
-            .join("\n")}`
+        ? isOnePage
+          ? `\n\nTESPiT EDİLEN ÜNİTE BAŞLIKLARI (Hepsini 4-6 kompakt sectionNotes başlığı altında birleştirip tek sayfaya sığacak özlükte kapsa):\n${checklistHeadings
+              .map((h, i) => `${i + 1}. ${h}`)
+              .join("\n")}`
+          : `\n\nTESPiT EDİLEN ÜNİTE BAŞLIKLARI (HİÇBİRİNİ ATLAMADAN TAMAMINI sectionNotes İÇİNDE İŞLE):\n${checklistHeadings
+              .map((h, i) => `${i + 1}. ${h}`)
+              .join("\n")}`
         : "";
 
     const prompt = `Ders Adı: ${courseName}
 Ünite Numarası: ${unitNumber} (${body.examScopeLabel?.trim() || (unitNumber <= 4 ? "Vize + Final Kapsamı" : "Final Kapsamı")})
 Kategori: ${effectiveCategory === "teknik" ? "Teknik / Kodlama / Uygulamalı" : "Sözel / Kavramsal"}
-İçerik Tipi: ${isFullUnit ? "Tam Ünite Metni (Kapsamlı)" : "Ünite Özeti / Ders Notu"}${checklistBlock}
+Çıktı Hedefi: ${isOnePage ? "TEK SAYFA A4 ÖZET (Yoğun, tekrarsız, 1 A4 kağıdına sığan sınav notu)" : isFullUnit ? "Tam Ünite Metni (Kapsamlı)" : "Ünite Özeti / Ders Notu"}${checklistBlock}
 
 Ünite İçeriği:
 """
@@ -469,13 +520,17 @@ ${trimmedText}
       clientAiConfig: body.clientAiConfig,
     });
 
-    const normalized = normalizeStudyGuide(result.data, effectiveCategory);
+    const normalized = normalizeStudyGuide(
+      result.data,
+      effectiveCategory,
+      isOnePage
+    );
 
-    // Otomatik Kapsam Denetimi ve Eksik Başlık Tamamlama (2. Tur)
+    // Otomatik Kapsam Denetimi (2. Tur yalnızca detaylı modda çalışır; tek sayfa modunda notu şişirmez)
     let autoCompletedCount = 0;
     let remainingMissing = findUncoveredHeadings(checklistHeadings, normalized);
 
-    if (remainingMissing.length > 0 && remainingMissing.length <= 15) {
+    if (!isOnePage && remainingMissing.length > 0 && remainingMissing.length <= 15) {
       try {
         const repairPrompt = `İlk çalışma rehberinde ünitedeki şu başlıklar/konular eksik kalmış görünüyor:
 ${remainingMissing.map((h, i) => `${i + 1}. ${h}`).join("\n")}

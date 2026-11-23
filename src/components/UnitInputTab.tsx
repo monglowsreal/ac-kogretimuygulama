@@ -345,8 +345,8 @@ export function UnitInputTab({
           <p className="text-xs text-slate-500 dark:text-slate-400">
             {canAnalyze
               ? selectedCourse.category === "teknik"
-                ? "Teknik analiz modu aktif: Kod/formül mantığı + pratik görevler üretilecek."
-                : "Sözel analiz modu aktif: Anahtar kavramlar + ezber ipuçları üretilecek."
+                ? "Tek Sayfa A4 Teknik Özet modu aktif: Kod/formül mantığı + özet notlar tek A4'e sığacak biçimde üretilecek."
+                : "Tek Sayfa A4 Sözel Özet modu aktif: Kritik kavramlar + sınav ayrıntıları tek A4'e sığacak biçimde üretilecek."
               : "Analiz için en az 50 karakterlik ünite metni girmelisin."}
           </p>
 

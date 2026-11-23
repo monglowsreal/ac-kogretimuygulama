@@ -41,7 +41,7 @@
 
 @page {
   size: A4 portrait;
-  margin: 11mm 12mm;
+  margin: 7mm 8mm;
 }
 
 @media print {
@@ -51,6 +51,8 @@
     color: #0f172a !important;
     margin: 0 !important;
     padding: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
@@ -69,6 +71,15 @@
     background: #ffffff !important;
     padding: 0 !important;
     margin: 0 !important;
+  }
+
+  body.a4-print-mode #a4-print-portal .a4-preview-scroll {
+    display: block !important;
+    overflow: visible !important;
+    height: auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #ffffff !important;
   }
 
   .a4-no-print {

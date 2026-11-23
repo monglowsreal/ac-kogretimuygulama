@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Download, Printer, X } from "lucide-react";
 import { useCoach } from "@/context/CoachContext";
 import {
   A4_DOCUMENT_CSS,
+  A4_PRINTABLE_HEIGHT_PX,
   buildStandaloneA4Html,
   slugifyFileName,
 } from "@/lib/a4-export";
@@ -19,7 +20,8 @@ interface A4PrintModalProps {
   initialUnitNumber: number;
 }
 
-type FontSizePreset = "sm" | "md" | "lg";
+type FontSizePreset = "xs" | "sm" | "md" | "lg";
+type LayoutPreset = "one_page" | "compact" | "full";
 
 interface PrintableUnitItem {
   unitNumber: number;
@@ -59,27 +61,27 @@ function renderUnitGuideHtml(
 
   return (
     <article key={unitNum} className="a4-unit-block">
-      <header className="a4-doc-header">
-        <div>
-          <div className="a4-doc-kicker">
-            {course.code} • AÖF Çalışma Notları (A4)
-          </div>
-          <h1 className="a4-doc-title">
-            {course.name} — Ünite {unitNum}
-          </h1>
-        </div>
-        <div className="a4-doc-meta">
+      <div className="a4-unit-inner">
+        <header className="a4-doc-header">
           <div>
-            <span className="a4-badge">{examInfo.badgeText}</span>
-            <span className="a4-badge">{isTeknik ? "Teknik" : "Sözel"}</span>
+            <div className="a4-doc-kicker">
+              {course.code} • AÖF Çalışma Notları (A4)
+            </div>
+            <h1 className="a4-doc-title">
+              {course.name} — Ünite {unitNum}
+            </h1>
           </div>
-          <div style={{ marginTop: "4px" }}>
-            {new Date(guide.generatedAt).toLocaleDateString("tr-TR")}
+          <div className="a4-doc-meta">
+            <div>
+              <span className="a4-badge">{examInfo.badgeText}</span>
+              <span className="a4-badge">{isTeknik ? "Teknik" : "Sözel"}</span>
+            </div>
+            <div style={{ marginTop: "2px" }}>
+              {new Date(guide.generatedAt).toLocaleDateString("tr-TR")}
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      <div className={opts.twoColumn ? "a4-cols-2" : undefined}>
         {opts.includeSections && guide.unitSummary && (
           <div className="a4-summary-box">
             <strong>Ünite Özeti</strong>
@@ -87,204 +89,207 @@ function renderUnitGuideHtml(
           </div>
         )}
 
-        {opts.includeCriticalDetails &&
-          guide.criticalDetails &&
-          guide.criticalDetails.length > 0 && (
+        <div className={opts.twoColumn ? "a4-cols-2" : undefined}>
+          {opts.includeCriticalDetails &&
+            guide.criticalDetails &&
+            guide.criticalDetails.length > 0 && (
+              <div className="a4-callout-warn">
+                <div className="a4-callout-title">
+                  Sınavda Çıkabilecek Kritik Ayrıntılar
+                </div>
+                <ul className="a4-list">
+                  {guide.criticalDetails.map((d, i) => (
+                    <li key={i}>{d}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+          {opts.includeTables &&
+            guide.comparisonTables &&
+            guide.comparisonTables.length > 0 && (
+              <>
+                <h2 className="a4-section-heading">Karşılaştırma Tabloları</h2>
+                {guide.comparisonTables.map((tbl, tIdx) => (
+                  <div key={tIdx} className="a4-table-wrap">
+                    <div className="a4-table-title">{tbl.title}</div>
+                    <table className="a4-table">
+                      <thead>
+                        <tr>
+                          {tbl.columns.map((col, cIdx) => (
+                            <th key={cIdx}>{col}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {tbl.rows.map((row, rIdx) => (
+                          <tr key={rIdx}>
+                            {row.map((cell, cIdx) => (
+                              <td key={cIdx}>{cell}</td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
+              </>
+            )}
+
+          {opts.includeSections &&
+            guide.sectionNotes &&
+            guide.sectionNotes.length > 0 && (
+              <>
+                <h2 className="a4-section-heading">
+                  Bölüm Bölüm Çalışma Notları ({guide.sectionNotes.length} Bölüm)
+                </h2>
+                {guide.sectionNotes.map((sec, idx) => (
+                  <section
+                    key={`${sec.sectionTitle}-${idx}`}
+                    className="a4-sec-card"
+                  >
+                    <div className="a4-sec-title">
+                      <span className="a4-sec-num">{idx + 1}</span>
+                      <span>{sec.sectionTitle}</span>
+                    </div>
+                    {sec.whatToKnow.length > 0 && (
+                      <ul className="a4-list">
+                        {sec.whatToKnow.map((fact, fIdx) => (
+                          <li key={fIdx}>{fact}</li>
+                        ))}
+                      </ul>
+                    )}
+                    {sec.examKeywords.length > 0 && (
+                      <div className="a4-keywords">
+                        <strong>Kavramlar: </strong>
+                        {sec.examKeywords.map((kw, kIdx) => (
+                          <span key={kIdx} className="a4-kw-tag">
+                            {kw}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {opts.includeAngles && sec.likelyQuestionAngle && (
+                      <div className="a4-angle">
+                        <strong>Sınav Açısı:</strong> {sec.likelyQuestionAngle}
+                      </div>
+                    )}
+                  </section>
+                ))}
+              </>
+            )}
+
+          {opts.includeConcepts && guide.criticalConcepts.length > 0 && (
+            <>
+              <h2 className="a4-section-heading">
+                Kritik Kavramlar ({guide.criticalConcepts.length})
+              </h2>
+              <div className="a4-concept-list">
+                {guide.criticalConcepts.map((c, idx) => (
+                  <div
+                    key={`${c.term}-${idx}`}
+                    className={`a4-concept-card ${
+                      c.importance === "yuksek" ? "is-high" : ""
+                    }`}
+                  >
+                    <span className="a4-concept-term">
+                      {c.term}
+                      {c.importance === "yuksek" ? " ★" : ""}:{" "}
+                    </span>
+                    <span>{c.definition}</span>
+                    {c.examTip && (
+                      <div className="a4-concept-tip">
+                        <strong>İpucu:</strong> {c.examTip}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {opts.includeStudyPlan && guide.studyPlan && (
+            <>
+              <h2 className="a4-section-heading">
+                Çalışma Stratejisi: {guide.studyPlan.approachTitle}
+              </h2>
+              {guide.studyPlan.actionSteps.length > 0 && (
+                <div className="a4-sec-card">
+                  <strong>Uygulama Adımları</strong>
+                  <ol className="a4-list">
+                    {guide.studyPlan.actionSteps.map((step, i) => (
+                      <li key={i}>{step}</li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+
+              {guide.studyPlan.keyDefinitionsFocus &&
+                guide.studyPlan.keyDefinitionsFocus.length > 0 && (
+                  <div className="a4-sec-card">
+                    <strong>Karıştırılmaması Gereken İnce Ayrımlar</strong>
+                    <ul className="a4-list">
+                      {guide.studyPlan.keyDefinitionsFocus.map((d, i) => (
+                        <li key={i}>{d}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+              {guide.studyPlan.memorizationTips &&
+                guide.studyPlan.memorizationTips.length > 0 && (
+                  <div className="a4-sec-card">
+                    <strong>Hafıza / Tekrar İpuçları</strong>
+                    <ul className="a4-list">
+                      {guide.studyPlan.memorizationTips.map((m, i) => (
+                        <li key={i}>{m}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+              {guide.studyPlan.codeBreakdowns &&
+                guide.studyPlan.codeBreakdowns.length > 0 &&
+                guide.studyPlan.codeBreakdowns.map((block, bIdx) => (
+                  <div key={bIdx} className="a4-sec-card">
+                    <strong>
+                      {block.title} ({block.language})
+                    </strong>
+                    <pre className="a4-code-box">{block.codeOrFormula}</pre>
+                    <ol className="a4-list">
+                      {block.stepByStepLogic.map((s, sIdx) => (
+                        <li key={sIdx}>{s}</li>
+                      ))}
+                    </ol>
+                    {block.commonTrap && (
+                      <div className="a4-angle">
+                        <strong>Sık Sınav Tuzağı:</strong> {block.commonTrap}
+                      </div>
+                    )}
+                  </div>
+                ))}
+            </>
+          )}
+
+          {opts.includeCriticalDetails && meaningfulVerification.length > 0 && (
             <div className="a4-callout-warn">
               <div className="a4-callout-title">
-                Sınavda Çıkabilecek Kritik Ayrıntılar
+                Kitaptan Doğrulanması Gereken Yerler
               </div>
               <ul className="a4-list">
-                {guide.criticalDetails.map((d, i) => (
-                  <li key={i}>{d}</li>
+                {meaningfulVerification.map((n, i) => (
+                  <li key={i}>{n}</li>
                 ))}
               </ul>
             </div>
           )}
+        </div>
 
-        {opts.includeTables &&
-          guide.comparisonTables &&
-          guide.comparisonTables.length > 0 && (
-            <>
-              <h2 className="a4-section-heading">Karşılaştırma Tabloları</h2>
-              {guide.comparisonTables.map((tbl, tIdx) => (
-                <div key={tIdx} className="a4-table-wrap">
-                  <div className="a4-table-title">{tbl.title}</div>
-                  <table className="a4-table">
-                    <thead>
-                      <tr>
-                        {tbl.columns.map((col, cIdx) => (
-                          <th key={cIdx}>{col}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {tbl.rows.map((row, rIdx) => (
-                        <tr key={rIdx}>
-                          {row.map((cell, cIdx) => (
-                            <td key={cIdx}>{cell}</td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ))}
-            </>
-          )}
-
-        {opts.includeSections &&
-          guide.sectionNotes &&
-          guide.sectionNotes.length > 0 && (
-            <>
-              <h2 className="a4-section-heading">
-                Bölüm Bölüm Çalışma ve Sınav Notları ({guide.sectionNotes.length}{" "}
-                Bölüm)
-              </h2>
-              {guide.sectionNotes.map((sec, idx) => (
-                <section key={`${sec.sectionTitle}-${idx}`} className="a4-sec-card">
-                  <div className="a4-sec-title">
-                    <span className="a4-sec-num">{idx + 1}</span>
-                    <span>{sec.sectionTitle}</span>
-                  </div>
-                  {sec.whatToKnow.length > 0 && (
-                    <ul className="a4-list">
-                      {sec.whatToKnow.map((fact, fIdx) => (
-                        <li key={fIdx}>{fact}</li>
-                      ))}
-                    </ul>
-                  )}
-                  {sec.examKeywords.length > 0 && (
-                    <div className="a4-keywords">
-                      <strong>Anahtar Kavramlar: </strong>
-                      {sec.examKeywords.map((kw, kIdx) => (
-                        <span key={kIdx} className="a4-kw-tag">
-                          {kw}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  {opts.includeAngles && sec.likelyQuestionAngle && (
-                    <div className="a4-angle">
-                      <strong>Sınavda Nasıl Sorulur:</strong>{" "}
-                      {sec.likelyQuestionAngle}
-                    </div>
-                  )}
-                </section>
-              ))}
-            </>
-          )}
-
-        {opts.includeConcepts && guide.criticalConcepts.length > 0 && (
-          <>
-            <h2 className="a4-section-heading">
-              Kritik Kavramlar ({guide.criticalConcepts.length})
-            </h2>
-            <div className="a4-concept-grid">
-              {guide.criticalConcepts.map((c, idx) => (
-                <div
-                  key={`${c.term}-${idx}`}
-                  className={`a4-concept-card ${
-                    c.importance === "yuksek" ? "is-high" : ""
-                  }`}
-                >
-                  <div className="a4-concept-term">
-                    {c.term}
-                    {c.importance === "yuksek" ? " ★" : ""}
-                  </div>
-                  <div>{c.definition}</div>
-                  {c.examTip && (
-                    <div className="a4-concept-tip">
-                      <strong>İpucu:</strong> {c.examTip}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-
-        {opts.includeStudyPlan && guide.studyPlan && (
-          <>
-            <h2 className="a4-section-heading">
-              Çalışma Stratejisi: {guide.studyPlan.approachTitle}
-            </h2>
-            {guide.studyPlan.actionSteps.length > 0 && (
-              <div className="a4-sec-card">
-                <strong>Uygulama Adımları</strong>
-                <ol className="a4-list">
-                  {guide.studyPlan.actionSteps.map((step, i) => (
-                    <li key={i}>{step}</li>
-                  ))}
-                </ol>
-              </div>
-            )}
-
-            {guide.studyPlan.keyDefinitionsFocus &&
-              guide.studyPlan.keyDefinitionsFocus.length > 0 && (
-                <div className="a4-sec-card">
-                  <strong>Karıştırılmaması Gereken İnce Ayrımlar</strong>
-                  <ul className="a4-list">
-                    {guide.studyPlan.keyDefinitionsFocus.map((d, i) => (
-                      <li key={i}>{d}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-            {guide.studyPlan.memorizationTips &&
-              guide.studyPlan.memorizationTips.length > 0 && (
-                <div className="a4-sec-card">
-                  <strong>Hafıza / Tekrar İpuçları</strong>
-                  <ul className="a4-list">
-                    {guide.studyPlan.memorizationTips.map((m, i) => (
-                      <li key={i}>{m}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-            {guide.studyPlan.codeBreakdowns &&
-              guide.studyPlan.codeBreakdowns.length > 0 &&
-              guide.studyPlan.codeBreakdowns.map((block, bIdx) => (
-                <div key={bIdx} className="a4-sec-card">
-                  <strong>
-                    {block.title} ({block.language})
-                  </strong>
-                  <pre className="a4-code-box">{block.codeOrFormula}</pre>
-                  <ol className="a4-list">
-                    {block.stepByStepLogic.map((s, sIdx) => (
-                      <li key={sIdx}>{s}</li>
-                    ))}
-                  </ol>
-                  {block.commonTrap && (
-                    <div className="a4-angle">
-                      <strong>Sık Sınav Tuzağı:</strong> {block.commonTrap}
-                    </div>
-                  )}
-                </div>
-              ))}
-          </>
-        )}
-
-        {opts.includeCriticalDetails && meaningfulVerification.length > 0 && (
-          <div className="a4-callout-warn">
-            <div className="a4-callout-title">
-              Kitaptan Doğrulanması Gereken Yerler
-            </div>
-            <ul className="a4-list">
-              {meaningfulVerification.map((n, i) => (
-                <li key={i}>{n}</li>
-              ))}
-            </ul>
-          </div>
-        )}
+        <footer className="a4-footer-note">
+          Not: Bu A4 çıktısı sınava hazırlığı hızlandırmak içindir; tam hakimiyet
+          için resmi AÖF ders kitabını ve çıkmış soruları mutlaka gözden geçirin.
+        </footer>
       </div>
-
-      <footer className="a4-footer-note">
-        Not: Bu A4 çıktısı sınava hazırlığı hızlandırmak içindir; tam hakimiyet
-        için resmi AÖF ders kitabını ve çıkmış soruları mutlaka gözden geçirin.
-      </footer>
     </article>
   );
 }
@@ -301,15 +306,18 @@ export function A4PrintModal({
   const [selectedUnits, setSelectedUnits] = useState<number[]>([
     initialUnitNumber,
   ]);
-  const [twoColumn, setTwoColumn] = useState(false);
-  const [fontSize, setFontSize] = useState<FontSizePreset>("md");
+  const [layoutPreset, setLayoutPreset] = useState<LayoutPreset>("one_page");
+  const [twoColumn, setTwoColumn] = useState(true);
+  const [fitOnePage, setFitOnePage] = useState(true);
+  const [fontSize, setFontSize] = useState<FontSizePreset>("xs");
   const [includeSections, setIncludeSections] = useState(true);
-  const [includeAngles, setIncludeAngles] = useState(true);
+  const [includeAngles, setIncludeAngles] = useState(false);
   const [includeTables, setIncludeTables] = useState(true);
   const [includeCriticalDetails, setIncludeCriticalDetails] = useState(true);
   const [includeConcepts, setIncludeConcepts] = useState(true);
-  const [includeStudyPlan, setIncludeStudyPlan] = useState(true);
+  const [includeStudyPlan, setIncludeStudyPlan] = useState(false);
   const [includeRawFallback, setIncludeRawFallback] = useState(true);
+  const fitStatusRef = useRef<HTMLSpanElement | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -323,6 +331,53 @@ export function A4PrintModal({
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [open, onClose]);
+
+  // Tek Sayfa A4 modu aktifken her ünitenin doğal yüksekliğini ölçüp
+  // gerekirse otomatik zoom ile kesin olarak 1 A4 sayfasına sığdır
+  useLayoutEffect(() => {
+    if (!open || !sheetRef.current) return;
+    const inners = sheetRef.current.querySelectorAll<HTMLElement>(".a4-unit-inner");
+    let minZoom = 1;
+
+    inners.forEach((el) => {
+      el.style.zoom = "1";
+      if (!fitOnePage) return;
+      const naturalHeight = el.scrollHeight;
+      if (naturalHeight > A4_PRINTABLE_HEIGHT_PX) {
+        const computed = Math.max(
+          0.52,
+          Number((A4_PRINTABLE_HEIGHT_PX / naturalHeight).toFixed(3))
+        );
+        el.style.zoom = String(computed);
+        if (computed < minZoom) minZoom = computed;
+      }
+    });
+
+    if (fitStatusRef.current) {
+      if (!fitOnePage) {
+        fitStatusRef.current.textContent = "Doğal Akış (Sayfa Bölünmesi Yok)";
+      } else if (minZoom < 0.999) {
+        fitStatusRef.current.textContent = `✓ Her Ünite 1 A4 Sayfasına Sığdırıldı (%${Math.round(
+          minZoom * 100
+        )})`;
+      } else {
+        fitStatusRef.current.textContent = "✓ Her Ünite 1 A4 Sayfasına Tam Sığıyor";
+      }
+    }
+  }, [
+    open,
+    fitOnePage,
+    twoColumn,
+    fontSize,
+    selectedUnits,
+    includeSections,
+    includeAngles,
+    includeTables,
+    includeCriticalDetails,
+    includeConcepts,
+    includeStudyPlan,
+    includeRawFallback,
+  ]);
 
   if (!open || typeof document === "undefined") return null;
 
@@ -368,8 +423,20 @@ export function A4PrintModal({
     if (matching.length > 0) setSelectedUnits(matching);
   };
 
-  const applyLayoutPreset = (preset: "full" | "cheatsheet") => {
-    if (preset === "cheatsheet") {
+  const applyLayoutPreset = (preset: LayoutPreset) => {
+    setLayoutPreset(preset);
+    if (preset === "one_page") {
+      setFitOnePage(true);
+      setTwoColumn(true);
+      setFontSize("xs");
+      setIncludeAngles(false);
+      setIncludeStudyPlan(false);
+      setIncludeCriticalDetails(true);
+      setIncludeTables(true);
+      setIncludeConcepts(true);
+      setIncludeSections(true);
+    } else if (preset === "compact") {
+      setFitOnePage(false);
       setTwoColumn(true);
       setFontSize("sm");
       setIncludeAngles(false);
@@ -379,6 +446,7 @@ export function A4PrintModal({
       setIncludeConcepts(true);
       setIncludeSections(true);
     } else {
+      setFitOnePage(false);
       setTwoColumn(false);
       setFontSize("md");
       setIncludeAngles(true);
@@ -531,30 +599,41 @@ export function A4PrintModal({
             <div className="inline-flex rounded-lg bg-slate-800 p-0.5">
               <button
                 type="button"
-                onClick={() => applyLayoutPreset("full")}
-                className={`rounded-md px-2 py-1 text-[11px] font-semibold ${
-                  !twoColumn
-                    ? "bg-indigo-600 text-white"
+                onClick={() => applyLayoutPreset("one_page")}
+                className={`rounded-md px-2.5 py-1 text-[11px] font-semibold ${
+                  layoutPreset === "one_page"
+                    ? "bg-emerald-600 text-white"
                     : "text-slate-300 hover:text-white"
                 }`}
               >
-                Tam Notlar
+                Tek Sayfa A4
               </button>
               <button
                 type="button"
-                onClick={() => applyLayoutPreset("cheatsheet")}
+                onClick={() => applyLayoutPreset("compact")}
                 className={`rounded-md px-2 py-1 text-[11px] font-semibold ${
-                  twoColumn
+                  layoutPreset === "compact"
                     ? "bg-indigo-600 text-white"
                     : "text-slate-300 hover:text-white"
                 }`}
               >
-                2 Sütun Sıkı Özet
+                2 Sütun Akış
+              </button>
+              <button
+                type="button"
+                onClick={() => applyLayoutPreset("full")}
+                className={`rounded-md px-2 py-1 text-[11px] font-semibold ${
+                  layoutPreset === "full"
+                    ? "bg-indigo-600 text-white"
+                    : "text-slate-300 hover:text-white"
+                }`}
+              >
+                Tek Sütun Detaylı
               </button>
             </div>
 
             <div className="inline-flex rounded-lg bg-slate-800 p-0.5">
-              {(["sm", "md", "lg"] as const).map((sz) => (
+              {(["xs", "sm", "md", "lg"] as const).map((sz) => (
                 <button
                   key={sz}
                   type="button"
@@ -565,10 +644,23 @@ export function A4PrintModal({
                       : "text-slate-400 hover:text-white"
                   }`}
                 >
-                  {sz === "sm" ? "Küçük" : sz === "md" ? "Orta" : "Büyük"}
+                  {sz === "xs"
+                    ? "Sıkı"
+                    : sz === "sm"
+                      ? "Küçük"
+                      : sz === "md"
+                        ? "Orta"
+                        : "Büyük"}
                 </button>
               ))}
             </div>
+
+            <span
+              ref={fitStatusRef}
+              className="rounded-lg bg-emerald-500/15 px-2.5 py-1 text-[11px] font-semibold text-emerald-300"
+            >
+              ✓ Her Ünite 1 A4 Sayfasına Sığdırıldı
+            </span>
           </div>
         </div>
 
@@ -634,7 +726,7 @@ export function A4PrintModal({
       </div>
 
       {/* Canlı A4 Sayfa Önizleme Alanı */}
-      <div className="flex-1 overflow-y-auto bg-slate-800 p-4 sm:p-8 print:overflow-visible print:bg-white print:p-0">
+      <div className="a4-preview-scroll flex-1 overflow-y-auto bg-slate-800 p-4 sm:p-8 print:overflow-visible print:bg-white print:p-0">
         {printableUnits.length === 0 ? (
           <div className="mx-auto max-w-lg rounded-2xl border border-slate-700 bg-slate-900 p-6 text-center text-xs text-slate-300">
             Seçilen üniteler için henüz çalışma rehberi veya ders metni
@@ -643,7 +735,9 @@ export function A4PrintModal({
         ) : (
           <div
             ref={sheetRef}
-            className={`a4-sheet a4-size-${fontSize}`}
+            className={`a4-sheet a4-size-${fontSize} ${
+              fitOnePage ? "a4-mode-one-page" : ""
+            }`}
           >
             {printableUnits.map(({ unitNumber, record }) => {
               if (record.guide) {
@@ -660,30 +754,34 @@ export function A4PrintModal({
 
               return (
                 <article key={unitNumber} className="a4-unit-block">
-                  <header className="a4-doc-header">
-                    <div>
-                      <div className="a4-doc-kicker">
-                        {course.code} • Ham Ünite Metni (A4)
+                  <div className="a4-unit-inner">
+                    <header className="a4-doc-header">
+                      <div>
+                        <div className="a4-doc-kicker">
+                          {course.code} • Ham Ünite Metni (A4)
+                        </div>
+                        <h1 className="a4-doc-title">
+                          {course.name} — Ünite {unitNumber}
+                        </h1>
                       </div>
-                      <h1 className="a4-doc-title">
-                        {course.name} — Ünite {unitNumber}
-                      </h1>
+                      <div className="a4-doc-meta">
+                        <span className="a4-badge">
+                          {record.fileName || "Yapıştırılmış Metin"}
+                        </span>
+                      </div>
+                    </header>
+                    <div className="a4-callout-warn">
+                      <div className="a4-callout-title">Bilgi Notu</div>
+                      <div>
+                        Bu ünite için henüz AI Çalışma Rehberi üretilmediğinden
+                        yüklenen ham ders metni basıma hazırlanmıştır.
+                      </div>
                     </div>
-                    <div className="a4-doc-meta">
-                      <span className="a4-badge">
-                        {record.fileName || "Yapıştırılmış Metin"}
-                      </span>
+                    <div
+                      className={`a4-raw-text ${twoColumn ? "a4-cols-2" : ""}`}
+                    >
+                      {record.rawText}
                     </div>
-                  </header>
-                  <div className="a4-callout-warn">
-                    <div className="a4-callout-title">Bilgi Notu</div>
-                    <div>
-                      Bu ünite için henüz AI Çalışma Rehberi üretilmediğinden
-                      yüklenen ham ders metni basıma hazırlanmıştır.
-                    </div>
-                  </div>
-                  <div className={`a4-raw-text ${twoColumn ? "a4-cols-2" : ""}`}>
-                    {record.rawText}
                   </div>
                 </article>
               );
